@@ -95,6 +95,7 @@ class WCARaceGeometry(gym.Env):
         self._build_racetrack()
 
         self.observation = None
+        self.last_observation = None
         self.last_spine_proj = None
 
         self.bng.start_scenario()
@@ -367,13 +368,26 @@ class WCARaceGeometry(gym.Env):
         self.last_spine_proj = self._spine_project_vehicle(vehicle_pos)
         return self.observation
 
+    def advance(self):
+        self.bng.step(self.steps, wait=False)
+
+    def observe(self):
+        sensors = self.bng.poll_sensors(self.vehicle)
+        new_observation = self._make_observation(sensors)
+        return new_observation, sensors
+
     def step(self, action):
+        action = [*np.clip(action, -1, 1), action[0], action[1]]
+        action = [float(v) for v in action]
+
         self.episode_steps += 1
 
         self._make_commands(action)
-        self.bng.step(self.steps, wait=False)
-        sensors = self.bng.poll_sensors(self.vehicle)
-        self.observation = self._make_observation(sensors)
+        self.advance()
+        new_observation, sensors = self.observe()
+        if self.observation is not None:
+            self.last_observation = self.observation
+        self.observation = new_observation
         score, done = self._compute_reward(sensors)
 
         print((' A: {:5.2f}  B: {:5.2f} '
