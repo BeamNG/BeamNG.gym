@@ -1,15 +1,15 @@
-import time
+from __future__ import annotations
 
-import gym
-import gym.spaces
+from typing import Any
+
+import gymnasium as gym
+import gymnasium.spaces as spaces
 import numpy as np
-import numpy.linalg as la
-
-from beamngpy import BeamNGpy, Scenario, Vehicle, setup_logging
-from beamngpy.sensors import Electrics, Damage
-
+from beamngpy import BeamNGpy, Scenario, Vehicle
+from beamngpy.misc.quat import angle_to_quat
+from beamngpy.sensors import Damage, Electrics
 from shapely import affinity
-from shapely.geometry import LinearRing, LineString, Polygon, Point
+from shapely.geometry import LinearRing, LineString, Point, Polygon
 
 
 def normalise_angle(angle):
@@ -71,26 +71,25 @@ class WCARaceGeometry(gym.Env):
         self.trail = lambda step: -trail_factor * step
 
         self.bng = BeamNGpy(self.host, self.port)
+        self.bng.open()
 
-        self.vehicle = Vehicle('racecar', model='sunburst', licence='BEAMNG',
-                               colour='red',
-                               partConfig='vehicles/sunburst/hillclimb.pc')
+        self.vehicle = Vehicle('racecar', model='sunburst', license='BEAMNG',
+                               color='red',
+                               part_config='vehicles/sunburst/hillclimb.pc')
 
         electrics = Electrics()
         damage = Damage()
-        self.vehicle.attach_sensor('electrics', electrics)
-        self.vehicle.attach_sensor('damage', damage)
+        self.vehicle.sensors.attach('electrics', electrics)
+        self.vehicle.sensors.attach('damage', damage)
 
         scenario = Scenario('west_coast_usa', 'wca_race_geometry_v0')
-        scenario.add_vehicle(self.vehicle, pos=(394.5, -247.925, 145.25),
-                             rot=(0, 0, 90))
+        scenario.add_vehicle(self.vehicle, pos=(394.5, -247.925, 145.25), rot_quat=angle_to_quat((0, 0, 90)))
 
         scenario.make(self.bng)
 
         self.bng.open(launch=True)
-        self.bng.set_deterministic()
-        self.bng.set_steps_per_second(WCARaceGeometry.sps)
-        self.bng.load_scenario(scenario)
+        self.bng.settings.set_deterministic(WCARaceGeometry.sps)
+        self.bng.scenario.load(scenario)
 
         self._build_racetrack()
 
@@ -98,22 +97,24 @@ class WCARaceGeometry(gym.Env):
         self.last_observation = None
         self.last_spine_proj = None
 
-        self.bng.start_scenario()
-        self.bng.pause()
+        self.bng.scenario.start()
+        self.bng.control.pause()
 
     def __del__(self):
         self.bng.close()
 
     def _build_racetrack(self):
-        roads = self.bng.get_roads()
-        track = roads['race_ref']
+        roads = self.bng.scenario.get_roads()
+        RACETRACK_PID = '064a5d03-61d1-4ed7-9136-905b40928f01'  # this is the persistent ID of the race circuit at the WCUSA map
+        track_id, _ = next(filter(lambda road: road[1]['persistentId'] == RACETRACK_PID, roads.items()))
+        track = self.bng.scenario.get_road_edges(track_id)
         l_vtx = []
         s_vtx = []
         r_vtx = []
-        for right, middle, left in track:
-            r_vtx.append(right)
-            s_vtx.append(middle)
-            l_vtx.append(left)
+        for edges in track:
+            r_vtx.append(edges['right'])
+            s_vtx.append(edges['middle'])
+            l_vtx.append(edges['left'])
 
         self.spine = LinearRing(s_vtx)
         self.r_edge = LinearRing(r_vtx)
@@ -126,8 +127,8 @@ class WCARaceGeometry(gym.Env):
     def _action_space(self):
         action_lo = [-1., -1.]
         action_hi = [+1., +1.]
-        return gym.spaces.Box(np.array(action_lo), np.array(action_hi),
-                              dtype=float)
+        return spaces.Box(np.array(action_lo), np.array(action_hi),
+                          dtype=float)
 
     def _observation_space(self):
         # n vertices of left and right polylines ahead and behind, 3 floats per
@@ -165,8 +166,8 @@ class WCARaceGeometry(gym.Env):
             np.inf,      # Wheel speed
             np.inf,      # Altitude
         ])
-        return gym.spaces.Box(np.array(obs_lo), np.array(obs_hi),
-                              dtype=float)
+        return spaces.Box(np.array(obs_lo), np.array(obs_hi),
+                          dtype=float)
 
     def _make_commands(self, action):
         brake = 0
@@ -283,7 +284,7 @@ class WCARaceGeometry(gym.Env):
         return spine_end.distance(Point(*spine_beg))
 
     def _make_observation(self, sensors):
-        electrics = sensors['electrics']['values']
+        electrics = sensors['electrics']
 
         vehicle_dir = self.vehicle.state['dir']
         vehicle_pos = self.vehicle.state['pos']
@@ -317,7 +318,7 @@ class WCARaceGeometry(gym.Env):
         obs.append(vangle)
         obs.append(spine_speed)
         obs.append(electrics['rpm'])
-        obs.append(electrics['gearIndex'])
+        obs.append(electrics['gear_index'])
         obs.append(electrics['throttle'])
         obs.append(electrics['brake'])
         obs.append(electrics['steering'])
@@ -332,47 +333,51 @@ class WCARaceGeometry(gym.Env):
         vehicle_pos = Point(*vehicle_pos)
 
         if damage['damage'] > WCARaceGeometry.max_damage:
-            return -1, True
+            return -1, True, False
 
         if not self.polygon.contains(Point(vehicle_pos.x, vehicle_pos.y)):
-            return -1, True
+            return -1, True, False
 
-        score, done = -1, False
+        score, truncated, terminated = -1, False, False
         spine_proj = self._spine_project_vehicle(vehicle_pos)
         if self.last_spine_proj is not None:
             diff = spine_proj - self.last_spine_proj
             if diff >= -0.10:
                 if diff < 0.5:
-                    return -1, False
+                    return -1, False, False
                 else:
-                    score, done = diff / self.steps, False
+                    score, truncated, terminated = diff / self.steps, False, False
             elif np.abs(diff) > self.spine.length * 0.95:
-                score, done = 1, True
+                score, truncated, terminated = 1, False, True
             else:
-                score, done = -1, True
+                score, truncated, terminated = -1, True, False
         self.last_spine_proj = spine_proj
-        return score, done
+        return score, truncated, terminated
 
-    def reset(self):
+    def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
+        super().reset(seed=seed, options=options)
+
         self.episode_steps = 0
-        self.vehicle.control(throttle=0, brake=0, steering=0)
-        self.bng.restart_scenario()
-        self.bng.step(30)
-        self.bng.pause()
-        self.vehicle.set_shift_mode(3)
+        self.vehicle.control(throttle=0.0, brake=0.0, steering=0.0)
+        self.bng.scenario.restart()
+        self.bng.control.step(30)
+        self.bng.control.pause()
+        self.vehicle.set_shift_mode('realistic_automatic')
         self.vehicle.control(gear=2)
-        sensors = self.bng.poll_sensors(self.vehicle)
+        self.vehicle.sensors.poll()
+        sensors = self.vehicle.sensors
         self.observation = self._make_observation(sensors)
         vehicle_pos = self.vehicle.state['pos']
         vehicle_pos = Point(*vehicle_pos)
         self.last_spine_proj = self._spine_project_vehicle(vehicle_pos)
-        return self.observation
+        return self.observation, {}
 
     def advance(self):
-        self.bng.step(self.steps, wait=False)
+        self.bng.step(self.steps, wait=True)
 
     def observe(self):
-        sensors = self.bng.poll_sensors(self.vehicle)
+        self.vehicle.sensors.poll()
+        sensors = self.vehicle.sensors
         new_observation = self._make_observation(sensors)
         return new_observation, sensors
 
@@ -388,16 +393,9 @@ class WCARaceGeometry(gym.Env):
         if self.observation is not None:
             self.last_observation = self.observation
         self.observation = new_observation
-        score, done = self._compute_reward(sensors)
+        score, truncated, terminated = self._compute_reward(sensors)
 
-        print((' A: {:5.2f}  B: {:5.2f} '
-               ' S: {:5.2f}  T: {:5.2f}  R: {:5.2f}').format(action[2],
-                                                             action[3],
-                                                             action[0],
-                                                             action[1],
-                                                             score))
+        print(f' A: {action[2]:5.2f}  B: {action[3]:5.2f} '
+              f' S: {action[0]:5.2f}  T: {action[1]:5.2f}  R: {score:5.2f}')
 
-        # if done:
-        #     self.bng.step(WCARaceGeometry.sps * 1)
-
-        return self.observation, score, done, {}
+        return self.observation, score, terminated, truncated, {}

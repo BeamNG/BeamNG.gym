@@ -2,27 +2,27 @@
 
 ## About
 
-BeamNG.gym is a collection of [OpenAI Gym](https://gym.openai.com/)
+BeamNG.gym is a collection of [Gymnasium](https://gymnasium.farama.org/)
 environments that cover various driving tasks simulated in
-[BeamNG.research](https://beamng.gmbh/research/).
+[BeamNG.tech](https://beamng.tech/).
 
-##  Installation
+## Installation
 
 Standard pip can be used to obtain the package of environments:
+```bash
+pip install beamng.gym
+```
 
-    pip install beamnggym
-
-A copy of [BeamNG.research](https://beamng.gmbh/research/) is also required to
-actually run the scenario. The basic version is freely available for *non-
-commercial* use.
+A copy of [BeamNG.tech](https://beamng.tech/) is also required to
+actually run the scenario. The basic version is freely available for academic non-commercial use.
 
 ## Configuration
 
 The environments assume an envirionment variable to be set that specifies where
-[BeamNG.research](https://beamng.gmbh/research/) has been installed to. After
+[BeamNG.tech](https://beamng.tech/) has been installed to. After
 obtaining a copy, set an environment variable called `BNG_HOME` that contains
 the path to your local installation's main directory -- the same that contains
-the `EULA.odt` file.
+the `EULA.pdf` file.
 
 ## Usage
 
@@ -33,7 +33,7 @@ the respective environment's ID. For example:
 ```python
 from random import uniform
 
-import gym
+import gymnasium as gym
 import beamnggym
 
 env = gym.make('BNG-WCA-Race-Geometry-v0')
@@ -50,7 +50,7 @@ print('Achieved reward:', total_reward)
 ## Environments
 
 Currently, the only environment is a time attack on the race track in the
-West Coas USA level of BeamNG.drive. New environments are being developed.
+West Coast USA level of BeamNG.drive. New environments are being developed.
 
 ### WCA Race
 
