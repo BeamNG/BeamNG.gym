@@ -1,3 +1,7 @@
+.. image:: https://img.shields.io/pypi/v/BeamNG.gym.svg
+    :alt: PyPI-Server
+    :target: https://pypi.org/project/BeamNG.gym/
+
 # BeamNG.gym
 
 ## About

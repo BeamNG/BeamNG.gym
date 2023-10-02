@@ -1,15 +1,21 @@
-#!/usr/bin/env python
-import sys
+"""
+    Setup file for BeamNG.gym.
+    Use setup.cfg to configure your project.
 
-from pkg_resources import VersionConflict, require
+    This file was generated with PyScaffold 4.5.
+    PyScaffold helps you to put up the scaffold of your new Python project.
+    Learn more under: https://pyscaffold.org/
+"""
 from setuptools import setup
 
-try:
-    require('setuptools>=46.4')
-except VersionConflict:
-    print("Error: version of setuptools is too old (<46.4)!")
-    sys.exit(1)
-
-
 if __name__ == "__main__":
-    setup(use_pyscaffold=True)
+    try:
+        setup()
+    except:  # noqa
+        print(
+            "\n\nAn error occurred while building the project, "
+            "please ensure you have the most updated version of setuptools, "
+            "setuptools_scm and wheel with:\n"
+            "   pip install -U setuptools setuptools_scm wheel\n\n"
+        )
+        raise
