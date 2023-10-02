@@ -4,8 +4,6 @@
 
 # BeamNG.gym
 
-## About
-
 BeamNG.gym is a collection of [Gymnasium](https://gymnasium.farama.org/)
 environments that cover various driving tasks simulated in
 [BeamNG.tech](https://beamng.tech/).
@@ -17,8 +15,17 @@ Standard pip can be used to obtain the package of environments:
 pip install beamng.gym
 ```
 
+Or install the version from source by:
+```bash
+git clone https://github.com/BeamNG/BeamNG.gym.git
+cd BeamNG.gym
+pip install --editable .
+```
+
 A copy of [BeamNG.tech](https://beamng.tech/) is also required to
 actually run the scenario. The basic version is freely available for academic non-commercial use.
+
+This version is compatible with BeamNG.tech 0.30 and BeamNGpy 1.27.
 
 ## Configuration
 
