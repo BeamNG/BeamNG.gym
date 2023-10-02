@@ -1,7 +1,3 @@
-.. image:: https://img.shields.io/pypi/v/BeamNG.gym.svg
-    :alt: PyPI-Server
-    :target: https://pypi.org/project/BeamNG.gym/
-
 # BeamNG.gym
 
 BeamNG.gym is a collection of [Gymnasium](https://gymnasium.farama.org/)
