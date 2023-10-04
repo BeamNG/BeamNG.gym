@@ -6,11 +6,19 @@
     PyScaffold helps you to put up the scaffold of your new Python project.
     Learn more under: https://pyscaffold.org/
 """
+import os
+
 from setuptools import setup
+
+
+def read(fil):
+    fil = os.path.join(os.path.dirname(__file__), fil)
+    with open(fil, encoding='utf-8') as f:
+        return f.read()
 
 if __name__ == "__main__":
     try:
-        setup()
+        setup(version=read('src/beamnggym/version.txt'))
     except:  # noqa
         print(
             "\n\nAn error occurred while building the project, "
