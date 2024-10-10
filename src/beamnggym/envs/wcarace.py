@@ -1,3 +1,6 @@
+'''
+Defines the WCARaceGeometry gymnasium environment.
+'''
 from __future__ import annotations
 
 from typing import Any
@@ -13,26 +16,70 @@ from shapely.geometry import LinearRing, LineString, Point, Polygon
 
 
 def normalise_angle(angle):
+    """
+    Normalize an angle to be within the range [0, 2π).
+
+    Args:
+        angle (float): The angle in radians to be normalized.
+
+    Returns:
+        float: The normalized angle within the range [0, 2π).
+    """
     if angle < 0:
         angle += np.pi * 2
     return angle
 
 
 def calculate_curvature(points, idx):
+    """
+    Calculate the curvature at a given point in a sequence of points.
+
+    Args:
+        points: points used to calculate the curvature.
+        idx (int): The index of the point at which to calculate the curvature.
+               idx cannot be the first or last index in the list.
+
+    Returns:
+        float: The curvature at the given point.
+
+    Raises:
+        ValueError: If `idx` is not between 1 and len(points) - 1.
+    """
+    if not 0 < idx < len(points) - 1:
+        raise ValueError('idx must be between 0 and len(points) - 1')
     p1 = points[idx - 1]
     p2 = points[idx + 0]
     p3 = points[idx + 1]
+    eps = 1e-8
     curvature = 2 * (
         (p2[0] - p1[0]) * (p3[1] - p2[1]) -
         (p2[1] - p1[1]) * (p3[0] - p2[0])) / (np.sqrt(
             (np.square(p2[0] - p1[0]) + np.square(p2[1] - p1[1])) *
             (np.square(p3[0] - p2[0]) + np.square(p3[1] - p2[1])) *
-            (np.square(p1[0] - p3[0]) + np.square(p1[1] - p3[1]))) + 0.00000001
+            (np.square(p1[0] - p3[0]) + np.square(p1[1] - p3[1]))) + eps
     )
     return curvature
 
 
-def calculate_inclination(points, idx):
+def calculate_inclination(points, idx: int) -> float:
+    """
+    Calculate the inclination between two points.
+
+    This function calculates the difference in the z-coordinate between the point at index `idx + 1` and the point at
+    index `idx - 1` in the given list of points.
+
+    Args:
+        points: the points used to calculate the inclination.
+        idx (int): The index of the point for which the inclination is to be calculated.
+
+    Returns:
+        float: The inclination between the points at index `idx + 1` and `idx - 1`.
+
+    Raises:
+        ValueError: If `idx` is not between 1 and len(points) - 1.
+    """
+    if not 0 < idx < len(points) - 1:
+        raise ValueError('idx must be between 0 and len(points) - 1')
     p1 = points[idx - 1]
     p3 = points[idx + 1]
     inclination = p3[2] - p1[2]
@@ -40,21 +87,27 @@ def calculate_inclination(points, idx):
 
 
 class WCARaceGeometry(gym.Env):
+    """
+    A gymnasium environment for the race circuit at the WCUSA map in BeamNG.tech.
+    """
     sps = 50
     rate = 5
 
-    front_dist = 800
-    front_step = 100
-    trail_dist = 104
-    trail_step = 13
+    front_dist = 800  # Distance ahead of the vehicle to generate spline observations
+    front_step = 100  # Number of steps ahead of the car to generate spline observations
+    front_factor = front_dist / front_step
+    trail_dist = 104  # Distance behind the vehicle to generate spline observations
+    trail_step = 13  # Number of trailing steps behind the car to generate spline observations
+    trail_factor = trail_dist / trail_step
 
     starting_proj = 1710
     max_damage = 100
 
-    def __init__(self, host='localhost', port=64256):
+    def __init__(self, host='localhost', port=64256, home=None):
         self.steps = WCARaceGeometry.sps // WCARaceGeometry.rate
         self.host = host
         self.port = port
+        self.home = home
 
         self.action_space = self._action_space()
         self.observation_space = self._observation_space()
@@ -65,12 +118,7 @@ class WCARaceGeometry(gym.Env):
         self.r_edge = None
         self.polygon = None
 
-        front_factor = WCARaceGeometry.front_dist / WCARaceGeometry.front_step
-        trail_factor = WCARaceGeometry.trail_dist / WCARaceGeometry.trail_step
-        self.front = lambda step: +front_factor * step
-        self.trail = lambda step: -trail_factor * step
-
-        self.bng = BeamNGpy(self.host, self.port)
+        self.bng = BeamNGpy(host=self.host, port=self.port, home=self.home)
         self.bng.open()
 
         self.vehicle = Vehicle('racecar', model='sunburst', license='BEAMNG',
@@ -101,11 +149,19 @@ class WCARaceGeometry(gym.Env):
         self.bng.control.pause()
 
     def __del__(self):
+        """
+        Destructor method that ensures the BeamNG simulator instance is properly closed when the object is deleted.
+        """
         self.bng.close()
 
     def _build_racetrack(self):
+        """
+        Builds the racetrack by extracting the Decal Road (2D spline) and road edges from the scenario and creating
+        geometric shapes to represent the left edge, right edge, and spine of the track.
+        """
         roads = self.bng.scenario.get_roads()
-        RACETRACK_PID = '064a5d03-61d1-4ed7-9136-905b40928f01'  # this is the persistent ID of the race circuit at the WCUSA map
+        # This is the persistent ID of the race circuit at the WCUSA map
+        RACETRACK_PID = '064a5d03-61d1-4ed7-9136-905b40928f01'
         track_id, _ = next(filter(lambda road: road[1]['persistentId'] == RACETRACK_PID, roads.items()))
         track = self.bng.scenario.get_road_edges(track_id)
         l_vtx = []
@@ -125,6 +181,15 @@ class WCARaceGeometry(gym.Env):
         self.polygon = Polygon(l_vtx, holes=[r_vtx])
 
     def _action_space(self):
+        """
+        Defines the action space for the environment.
+
+        The action space is a continuous space represented by a Box with two dimensions. Each dimension can take values
+        in the range [-1, 1].
+
+        Returns:
+            gym.spaces.Box: A Box object representing the action space.
+        """
         action_lo = [-1., -1.]
         action_hi = [+1., +1.]
         return spaces.Box(np.array(action_lo), np.array(action_hi),
@@ -170,6 +235,17 @@ class WCARaceGeometry(gym.Env):
                           dtype=float)
 
     def _make_commands(self, action):
+        """
+        Maps and actuates the gymnasium action to a BeamNGpy control command.
+
+        Args:
+            action (list or tuple): A sequence containing steering and
+                                    throttle values.
+                - action[0]: Steering value (float) where negative values indicate left turn and positive values
+                             indicate right turn.
+                - action[1]: Throttle value (float) where positive values indicate acceleration and negative values
+                             indicate braking.
+        """
         brake = 0
         throttle = action[1]
         steering = action[0]
@@ -180,6 +256,15 @@ class WCARaceGeometry(gym.Env):
         self.vehicle.control(steering=steering, throttle=throttle, brake=brake)
 
     def _project_vehicle(self, pos):
+        """
+        Projects a vehicle's position onto the left edge, right edge, and spine of the track.
+
+        Args:
+            pos (tuple): The position of the vehicle to be projected.
+
+        Returns:
+            tuple: A tuple containing the projected positions on the left edge, spine, and right edge.
+        """
         r_proj = self.r_edge.project(pos)
         r_proj = self.r_edge.interpolate(r_proj)
         l_proj = self.l_edge.project(r_proj)
@@ -227,20 +312,27 @@ class WCARaceGeometry(gym.Env):
             width = l_proj.distance(r_proj)
             s_width.append(width)
 
-    def _gen_track_scope(self, pos, spine_seg):
+    def _gen_track_scope(self, vehicle_pos, spine_seg):
         s_scope = []
         s_width = []
 
-        base = self.spine.project(pos)
+        self.front_step_fn = lambda step: +WCARaceGeometry.front_factor * step
+        self.trail_step_fn = lambda step: -WCARaceGeometry.trail_factor * step
 
+        # Project the vehicle's position onto the spine of the track
+        base = self.spine.project(vehicle_pos)
+
+        # Add the track spline points behind the vehicle to the scope
         it = range(WCARaceGeometry.trail_step, 0, -1)
-        self._gen_track_scope_loop(it, self.trail, base, s_scope, s_width)
+        self._gen_track_scope_loop(it, self.trail_step_fn, base, s_scope, s_width)
 
-        it = range(1)
+        # Add the track point directly at the vehicle to the scope
+        it = range(1)  # TODO: Is this redundant due to the ahead points below?
         self._gen_track_scope_loop(it, lambda x: x, base, s_scope, s_width)
 
+        # Add the track spline points ahead of the vehicle to the scope
         it = range(WCARaceGeometry.front_step + 1)
-        self._gen_track_scope_loop(it, self.front, base, s_scope, s_width)
+        self._gen_track_scope_loop(it, self.trail_step_fn, base, s_scope, s_width)
 
         s_proj = self.spine.interpolate(base)
         offset = (-s_proj.x, -s_proj.y, -s_proj.z)
@@ -250,6 +342,7 @@ class WCARaceGeometry(gym.Env):
         spine_beg = spine_seg.coords[+0]
         spine_end = spine_seg.coords[-1]
         direction = [spine_end[i] - spine_beg[i] for i in range(3)]
+        # Get the angle of the spine in the XY plane
         angle = np.arctan2(direction[1], direction[0]) + np.pi / 2
 
         s_line = affinity.rotate(s_line, -angle, origin=(0, 0),
@@ -268,9 +361,20 @@ class WCARaceGeometry(gym.Env):
         return ret
 
     def _spine_project_vehicle(self, vehicle_pos):
+        """
+        Projects a vehicle's position onto the spine of the track and returns the distance remaining to the end of the
+        track.
+
+        Args:
+            vehicle_pos (float): The position of the vehicle to be projected.
+
+        Returns:
+            float: The adjusted projection of the vehicle's position on the spine.
+        """
         proj = self.spine.project(vehicle_pos) - WCARaceGeometry.starting_proj
         if proj < 0:
             proj += self.spine.length
+        # Distance remaining to the end of the track
         proj = self.spine.length - proj
         return proj
 
@@ -290,9 +394,10 @@ class WCARaceGeometry(gym.Env):
         vehicle_pos = self.vehicle.state['pos']
         vehicle_pos = Point(*vehicle_pos)
 
+        # Get the spine segment the vehicle is on
         spine_beg = self.spine.project(vehicle_pos)
         spine_end = spine_beg
-        spine_end += WCARaceGeometry.front_dist / WCARaceGeometry.front_step
+        spine_end += WCARaceGeometry.front_factor
         spine_beg = self.spine.interpolate(spine_beg)
         spine_end = self.spine.interpolate(spine_end)
         spine_seg = LineString([spine_beg, spine_end])
@@ -328,33 +433,59 @@ class WCARaceGeometry(gym.Env):
         return np.array(obs)
 
     def _compute_reward(self, sensors):
+        """
+        Computes the reward based on the vehicle's damage and progression along the spine of the track.
+
+        Args:
+            sensors (dict): A dictionary containing sensor data, including 'damage'.
+
+        Returns:
+            tuple: A tuple containing:
+                - score (float): The computed reward score.
+                - truncated (bool): Whether the episode is truncated.
+                - terminated (bool): Whether the episode is terminated.
+        """
         damage = sensors['damage']
         vehicle_pos = self.vehicle.state['pos']
         vehicle_pos = Point(*vehicle_pos)
 
+        # If the damage exceeds the maximum allowed damage, the episode is truncated.
         if damage['damage'] > WCARaceGeometry.max_damage:
             return -1, True, False
 
+        # If the vehicle is outside the track polygon, the episode is truncated.
         if not self.polygon.contains(Point(vehicle_pos.x, vehicle_pos.y)):
             return -1, True, False
 
         score, truncated, terminated = -1, False, False
-        spine_proj = self._spine_project_vehicle(vehicle_pos)
-        if self.last_spine_proj is not None:
+        spine_proj = self._spine_project_vehicle(vehicle_pos)  # Distance remaining to the end of the track
+        if self.last_spine_proj is not None:  # If this is not the first step
             diff = spine_proj - self.last_spine_proj
-            if diff >= -0.10:
-                if diff < 0.5:
+            if diff <= 0:  # If the vehicle is moving forwards
+                if diff > -0.2:  # If the vehicle is moving slowly forwards
                     return -1, False, False
-                else:
+                else:  # If the vehicle is moving quickly forwards
                     score, truncated, terminated = diff / self.steps, False, False
-            elif np.abs(diff) > self.spine.length * 0.95:
+            elif np.abs(diff) > self.spine.length * 0.95:  # If the vehicle has completed at least 95% of the track
                 score, truncated, terminated = 1, False, True
-            else:
+            else:  # If the vehicle is moving backwards and has not completed at least 95% of the track
                 score, truncated, terminated = -1, True, False
         self.last_spine_proj = spine_proj
         return score, truncated, terminated
 
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
+        """
+        Resets the environment to an initial state and returns an initial observation.
+
+        Args:
+            seed (int | None): The seed for random number generation. Default is None.
+            options (dict[str, Any] | None): Additional options for resetting the environment. Default is None.
+
+        Returns:
+            tuple:
+                - observation (any): The initial observation.
+                - info (dict): Additional information, currently an empty dictionary.
+        """
         super().reset(seed=seed, options=options)
 
         self.episode_steps = 0
@@ -373,15 +504,41 @@ class WCARaceGeometry(gym.Env):
         return self.observation, {}
 
     def advance(self):
+        """
+        Advances the BeamNG simulation by the number of steps specified in the `steps` attribute.
+        """
         self.bng.step(self.steps, wait=True)
 
     def observe(self):
+        """
+        Polls the vehicle's sensors to update their state and then generates a new observation.
+
+        Returns:
+            tuple:
+                - new_observation: The newly created observation based on the sensor data.
+                - sensors: The sensor objects providing the latest sensor data.
+        """
         self.vehicle.sensors.poll()
         sensors = self.vehicle.sensors
         new_observation = self._make_observation(sensors)
         return new_observation, sensors
 
-    def step(self, action):
+    def step(self, action: list) -> tuple:
+        """
+        Execute one step in the environment with the given action and returns the new observation, reward, and episode
+        end statuses.
+
+        Args:
+            action (list): A list of action values to be taken by the agent. The values are clipped between -1 and 1.
+
+        Returns:
+        tuple: A tuple containing:
+            - observation (any): The new observation after taking the action.
+            - score (float): The reward obtained after taking the action.
+            - terminated (bool): Whether the episode has terminated.
+            - truncated (bool): Whether the episode has been truncated.
+            - info (dict): Additional information, currently an empty dictionary.
+        """
         action = [*np.clip(action, -1, 1), action[0], action[1]]
         action = [float(v) for v in action]
 
@@ -397,5 +554,11 @@ class WCARaceGeometry(gym.Env):
 
         print(f' A: {action[2]:5.2f}  B: {action[3]:5.2f} '
               f' S: {action[0]:5.2f}  T: {action[1]:5.2f}  R: {score:5.2f}')
+
+        if truncated:
+            print('Episode truncated')
+
+        if terminated:
+            print('Episode terminated')
 
         return self.observation, score, terminated, truncated, {}
