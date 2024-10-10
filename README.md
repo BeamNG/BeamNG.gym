@@ -7,11 +7,13 @@ environments that cover various driving tasks simulated in
 ## Installation
 
 Standard pip can be used to obtain the package of environments:
+
 ```bash
 pip install beamng.gym
 ```
 
 Or install the version from source by:
+
 ```bash
 git clone https://github.com/BeamNG/BeamNG.gym.git
 cd BeamNG.gym
@@ -41,17 +43,20 @@ the respective environment's ID. For example:
 from random import uniform
 
 import gymnasium as gym
-import beamnggym
+import beamnggym  # noqa: F401
 
-env = gym.make('BNG-WCA-Race-Geometry-v0')
-env.reset()
-total_reward, done = 0, False
-# Drive around randomly until finishing
-while not done:
-    obs, reward, done, aux = env.step((uniform(-1, 1), uniform(-1, 1)))
-    total_reward += reward
-print('Achieved reward:', total_reward)
-...
+SIMULATOR_HOME_DIR = '/path/to/your/BeamNG_Tech_folder'
+
+env = gym.make('BNG-WCA-Race-Geometry-v0', home=SIMULATOR_HOME_DIR)
+while True:
+    print('Resetting environment...')
+    env.reset()
+    total_reward, terminated, truncated = 0, False, False
+    # Drive around randomly until finishing
+    while not terminated and not truncated:
+        obs, reward, terminated, truncated, info = env.step((uniform(-1, 1), uniform(-1, 1) * 10))
+        total_reward += reward
+    print('Achieved reward:', total_reward)
 ```
 
 ## Environments
