@@ -51,7 +51,7 @@ class WCARaceGeometry(gym.Env):
     starting_proj = 1710
     max_damage = 100
 
-    def __init__(self, host='localhost', port=64256):
+    def __init__(self, host='localhost', port=25252):
         self.steps = WCARaceGeometry.sps // WCARaceGeometry.rate
         self.host = host
         self.port = port
