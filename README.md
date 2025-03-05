@@ -31,7 +31,7 @@ The environments assume an envirionment variable to be set that specifies where
 [BeamNG.tech](https://beamng.tech/) has been installed to. After
 obtaining a copy, set an environment variable called `BNG_HOME` that contains
 the path to your local installation's main directory -- the same that contains
-the `EULA.pdf` file.
+the `EULA.pdf` file or you can add your local installation path to the `SIMULATOR_HOME_DIR` parameter in the `wcarace_ex.py` example.
 
 ## Usage
 
