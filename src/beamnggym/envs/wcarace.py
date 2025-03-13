@@ -333,10 +333,10 @@ class WCARaceGeometry(gym.Env):
         vehicle_pos = Point(*vehicle_pos)
 
         if damage['damage'] > WCARaceGeometry.max_damage:
-            return -1, True, False
+            return -1, False, True
 
         if not self.polygon.contains(Point(vehicle_pos.x, vehicle_pos.y)):
-            return -1, True, False
+            return -1, False, True
 
         score, truncated, terminated = -1, False, False
         spine_proj = self._spine_project_vehicle(vehicle_pos)
