@@ -60,6 +60,7 @@ class WCARaceGeometry(gym.Env):
         self.observation_space = self._observation_space()
 
         self.episode_steps = 0
+        self.max_episode_steps = 100000
         self.spine = None
         self.l_edge = None
         self.r_edge = None
@@ -332,25 +333,38 @@ class WCARaceGeometry(gym.Env):
         vehicle_pos = self.vehicle.state['pos']
         vehicle_pos = Point(*vehicle_pos)
 
+        # [TRUNCATE] Check if the episode reached the maximum number of steps
+        if self.episode_steps >= self.max_episode_steps:
+            return 0, True, False
+
+        # [TERMINATE] Check if the vehicle is damaged
         if damage['damage'] > WCARaceGeometry.max_damage:
             return -1, False, True
 
+        # [TERMINATE] Check if the vehicle is outside the track
         if not self.polygon.contains(Point(vehicle_pos.x, vehicle_pos.y)):
             return -1, False, True
+        
+        score, truncated, terminated = 0, False, False
 
-        score, truncated, terminated = -1, False, False
         spine_proj = self._spine_project_vehicle(vehicle_pos)
+
         if self.last_spine_proj is not None:
-            diff = spine_proj - self.last_spine_proj
-            if diff >= -0.10:
-                if diff < 0.5:
-                    return -1, False, False
-                else:
-                    score, truncated, terminated = diff / self.steps, False, False
-            elif np.abs(diff) > self.spine.length * 0.95:
-                score, truncated, terminated = 1, False, True
-            else:
-                score, truncated, terminated = -1, True, False
+            diff = self.last_spine_proj - spine_proj
+
+            # [TERMINATE] Check if the vehicle is moving backwards  
+            if diff < -1.0:
+                return -1, False, True
+            
+            # [REWARD] Check if the vehicle crossed the finish line
+            if np.abs(diff) > self.spine.length * 0.95:
+                return 0, False, False
+            
+            # [REWARD] Compute the reward based on the distance covered
+            score = np.clip(1 - (diff / self.spine.length), 0, 1)
+
+            return score, False, False
+
         self.last_spine_proj = spine_proj
         return score, truncated, terminated
 
