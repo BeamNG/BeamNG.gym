@@ -60,7 +60,8 @@ class WCARaceGeometry(gym.Env):
         self.observation_space = self._observation_space()
 
         self.episode_steps = 0
-        self.max_episode_steps = 100000
+        self.max_episode_steps = 1000
+        self.standstill_steps = 0
         self.spine = None
         self.l_edge = None
         self.r_edge = None
@@ -144,13 +145,13 @@ class WCARaceGeometry(gym.Env):
             -2 * np.pi,  # Angle
             -2 * np.pi,  # Vertical angle
             -np.inf,     # Spine speed
-            0,           # RPM
-            -1,          # Gear
-            0,           # Throttle
-            0,           # Brake
-            -1.0,        # Steering
-            0,           # Wheel speed
-            -np.inf,     # Altitude
+            # 0,           # RPM
+            # -1,          # Gear
+            # 0,           # Throttle
+            # 0,           # Brake
+            # -1.0,        # Steering
+            # 0,           # Wheel speed
+            # -np.inf,     # Altitude
         ])
         obs_hi.extend([
             np.inf,      # Distance to left edge
@@ -159,13 +160,13 @@ class WCARaceGeometry(gym.Env):
             2 * np.pi,   # Angle
             2 * np.pi,   # Vertical angle
             np.inf,      # Spine speed
-            np.inf,      # RPM
-            8,           # Gear
-            1.0,         # Throttle
-            1.0,         # Brake
-            1.0,         # Steering
-            np.inf,      # Wheel speed
-            np.inf,      # Altitude
+            # np.inf,      # RPM
+            # 8,           # Gear
+            # 1.0,         # Throttle
+            # 1.0,         # Brake
+            # 1.0,         # Steering
+            # np.inf,      # Wheel speed
+            # np.inf,      # Altitude
         ])
         return spaces.Box(np.array(obs_lo), np.array(obs_hi),
                           dtype=float)
@@ -318,13 +319,13 @@ class WCARaceGeometry(gym.Env):
         obs.append(angle)
         obs.append(vangle)
         obs.append(spine_speed)
-        obs.append(electrics['rpm'])
-        obs.append(electrics['gear_index'])
-        obs.append(electrics['throttle'])
-        obs.append(electrics['brake'])
-        obs.append(electrics['steering'])
-        obs.append(electrics['wheelspeed'])
-        obs.append(electrics['altitude'])
+        # obs.append(electrics['rpm'])
+        # obs.append(electrics['gear_index'])
+        # obs.append(electrics['throttle'])
+        # obs.append(electrics['brake'])
+        # obs.append(electrics['steering'])
+        # obs.append(electrics['wheelspeed'])
+        # obs.append(electrics['altitude'])
 
         return np.array(obs)
 
@@ -344,28 +345,39 @@ class WCARaceGeometry(gym.Env):
         # [TERMINATE] Check if the vehicle is outside the track
         if not self.polygon.contains(Point(vehicle_pos.x, vehicle_pos.y)):
             return -1, False, True
-        
+
         score, truncated, terminated = 0, False, False
 
         spine_proj = self._spine_project_vehicle(vehicle_pos)
 
         if self.last_spine_proj is not None:
             diff = self.last_spine_proj - spine_proj
+            self.last_spine_proj = spine_proj
 
-            # [TERMINATE] Check if the vehicle is moving backwards  
-            if diff < -1.0:
+            # [TERMINATE] If still for too long kill
+            if diff < 0.5:
+                self.standstill_steps += 1
+                if self.standstill_steps > 10:
+                    self.standstill_steps = 0
+                    return -1, False, True
+                else:
+                    return diff-0.5, False, False
+            else:
+                self.standstill_steps = 0
+
+            # [TERMINATE] Check if the vehicle is moving backwards
+            if diff < -0.1:
                 return -1, False, True
-            
-            # [REWARD] Check if the vehicle crossed the finish line
-            if np.abs(diff) > self.spine.length * 0.95:
-                return 0, False, False
-            
+
+            # Fix wrap around issue
+            if np.abs(diff) > self.spine.length * 0.50:
+                return 1, False, False
+
             # [REWARD] Compute the reward based on the distance covered
-            score = np.clip(1 - (diff / self.spine.length), 0, 1)
+            score = np.clip((diff / 5), 0, 1)
 
             return score, False, False
 
-        self.last_spine_proj = spine_proj
         return score, truncated, terminated
 
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
