@@ -160,13 +160,13 @@ class WCARaceGeometry(gym.Env):
             2 * np.pi,   # Angle
             2 * np.pi,   # Vertical angle
             np.inf,      # Spine speed
-            # np.inf,      # RPM
-            # 8,           # Gear
-            # 1.0,         # Throttle
-            # 1.0,         # Brake
-            # 1.0,         # Steering
-            # np.inf,      # Wheel speed
-            # np.inf,      # Altitude
+            np.inf,      # RPM
+            8,           # Gear
+            1.0,         # Throttle
+            1.0,         # Brake
+            1.0,         # Steering
+            np.inf,      # Wheel speed
+            np.inf,      # Altitude
         ])
         return spaces.Box(np.array(obs_lo), np.array(obs_hi),
                           dtype=float)
@@ -319,13 +319,13 @@ class WCARaceGeometry(gym.Env):
         obs.append(angle)
         obs.append(vangle)
         obs.append(spine_speed)
-        # obs.append(electrics['rpm'])
-        # obs.append(electrics['gear_index'])
-        # obs.append(electrics['throttle'])
-        # obs.append(electrics['brake'])
-        # obs.append(electrics['steering'])
-        # obs.append(electrics['wheelspeed'])
-        # obs.append(electrics['altitude'])
+        obs.append(electrics['rpm'])
+        obs.append(electrics['gear_index'])
+        obs.append(electrics['throttle'])
+        obs.append(electrics['brake'])
+        obs.append(electrics['steering'])
+        obs.append(electrics['wheelspeed'])
+        obs.append(electrics['altitude'])
 
         return np.array(obs)
 
