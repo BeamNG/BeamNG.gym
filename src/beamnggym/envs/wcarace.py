@@ -395,7 +395,7 @@ class WCARaceGeometry(gym.Env):
         spine_point = self.spine.interpolate(random_distance)
         
         # Get track direction at this point
-        next_point = self.spine.interpolate(self._wrap_length(random_distance + 5))
+        next_point = self.spine.interpolate(self._wrap_length(random_distance + 0.1))
         track_direction = [next_point.x - spine_point.x, next_point.y - spine_point.y, next_point.z - spine_point.z]
         
         # Calculate quaternion for rotation (facing forward along track)
