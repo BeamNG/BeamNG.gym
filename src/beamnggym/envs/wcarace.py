@@ -403,7 +403,7 @@ class WCARaceGeometry(gym.Env):
         yaw_deg = np.degrees(np.arctan2(track_direction[1], track_direction[0]))
         
         # Teleport the vehicle to the random position with correct orientation
-        self.vehicle.teleport(pos=(spine_point.x, spine_point.y, spine_point.z + 0.1), rot_quat=angle_to_quat((0, 0, yaw_deg)))
+        self.vehicle.teleport(pos=(spine_point.x, spine_point.y, spine_point.z + 1.0), rot_quat=angle_to_quat((0, 0, yaw_deg)))
         
         # Reset controls and continue with initialization
         self.vehicle.control(throttle=0.0, brake=0.0, steering=0.0)
