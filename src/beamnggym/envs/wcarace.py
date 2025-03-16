@@ -334,6 +334,13 @@ class WCARaceGeometry(gym.Env):
         vehicle_pos = self.vehicle.state['pos']
         vehicle_pos = Point(*vehicle_pos)
 
+        spine_beg = self.spine.project(vehicle_pos)
+        spine_end = spine_beg
+        spine_end += WCARaceGeometry.front_dist / WCARaceGeometry.front_step
+        spine_beg = self.spine.interpolate(spine_beg)
+        spine_end = self.spine.interpolate(spine_end)
+        spine_seg = LineString([spine_beg, spine_end])
+
         # [TRUNCATE] Check if the episode reached the maximum number of steps
         if self.episode_steps >= self.max_episode_steps:
             return 0, True, False
@@ -350,6 +357,8 @@ class WCARaceGeometry(gym.Env):
 
         spine_proj = self._spine_project_vehicle(vehicle_pos)
 
+        angle, _, _ = self._get_vehicle_angles(vehicle_pos, spine_seg)
+
         if self.last_spine_proj is not None:
             diff = self.last_spine_proj - spine_proj
             self.last_spine_proj = spine_proj
@@ -361,7 +370,8 @@ class WCARaceGeometry(gym.Env):
                     self.standstill_steps = 0
                     return -1, False, True
                 else:
-                    return diff-0.5, False, False
+                    # return diff-0.5, False, False
+                    score += diff - 0.5
             else:
                 self.standstill_steps = 0
 
@@ -371,10 +381,13 @@ class WCARaceGeometry(gym.Env):
 
             # Fix wrap around issue
             if np.abs(diff) > self.spine.length * 0.50:
-                return 1, False, False
+                score = 1
 
-            # [REWARD] Compute the reward based on the distance covered
-            score = np.clip((diff / 5), 0, 1)
+            # [REWARD] Compute the reward based on the spline speed
+            score += (diff / 5)
+
+            # [REWARD] Compute the punishment based on angle 
+            score -= np.pi - abs(angle)
 
             return score, False, False
 
@@ -382,32 +395,11 @@ class WCARaceGeometry(gym.Env):
 
     def reset(self, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed, options=options)
-        
+
         self.episode_steps = 0
-        self.standstill_steps = 0
-        
-        # Get a random position on the spine
-        if seed is not None:
-            np.random.seed(seed)
-        
-        # Choose a random position along the spine
-        random_distance = np.random.uniform(0, self.spine.length)
-        spine_point = self.spine.interpolate(random_distance)
-        
-        # Get track direction at this point
-        next_point = self.spine.interpolate(self._wrap_length(random_distance + 0.1))
-        track_direction = [next_point.x - spine_point.x, next_point.y - spine_point.y, next_point.z - spine_point.z]
-        
-        # Calculate quaternion for rotation (facing forward along track)
-        # Convert direction to yaw angle (in degrees)
-        yaw_deg = np.degrees(np.arctan2(track_direction[1], track_direction[0]))
-        
-        # Teleport the vehicle to the random position with correct orientation
-        self.vehicle.teleport(pos=(spine_point.x, spine_point.y, spine_point.z + 1.0), rot_quat=angle_to_quat((0, 0, yaw_deg)))
-        
-        # Reset controls and continue with initialization
         self.vehicle.control(throttle=0.0, brake=0.0, steering=0.0)
-        self.bng.control.step(100)
+        self.bng.scenario.restart()
+        self.bng.control.step(30)
         self.bng.control.pause()
         self.vehicle.set_shift_mode('realistic_automatic')
         self.vehicle.control(gear=2)
@@ -417,7 +409,6 @@ class WCARaceGeometry(gym.Env):
         vehicle_pos = self.vehicle.state['pos']
         vehicle_pos = Point(*vehicle_pos)
         self.last_spine_proj = self._spine_project_vehicle(vehicle_pos)
-        
         return self.observation, {}
 
     def advance(self):
