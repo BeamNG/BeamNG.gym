@@ -145,13 +145,13 @@ class WCARaceGeometry(gym.Env):
             -2 * np.pi,  # Angle
             -2 * np.pi,  # Vertical angle
             -np.inf,     # Spine speed
-            # 0,           # RPM
-            # -1,          # Gear
-            # 0,           # Throttle
-            # 0,           # Brake
-            # -1.0,        # Steering
-            # 0,           # Wheel speed
-            # -np.inf,     # Altitude
+            0,           # RPM
+            -1,          # Gear
+            0,           # Throttle
+            0,           # Brake
+            -1.0,        # Steering
+            0,           # Wheel speed
+            -np.inf,     # Altitude
         ])
         obs_hi.extend([
             np.inf,      # Distance to left edge
