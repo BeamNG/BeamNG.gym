@@ -407,7 +407,7 @@ class WCARaceGeometry(gym.Env):
         
         # Reset controls and continue with initialization
         self.vehicle.control(throttle=0.0, brake=0.0, steering=0.0)
-        self.bng.control.step(30)
+        self.bng.control.step(60)
         self.bng.control.pause()
         self.vehicle.set_shift_mode('realistic_automatic')
         self.vehicle.control(gear=2)
