@@ -357,7 +357,7 @@ class WCARaceGeometry(gym.Env):
             # [TERMINATE] If still for too long kill
             if diff < 0.5:
                 self.standstill_steps += 1
-                if self.standstill_steps > 10:
+                if self.standstill_steps > 20:
                     self.standstill_steps = 0
                     return -1, False, True
                 else:
