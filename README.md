@@ -25,13 +25,16 @@ actually run the scenario. The basic version is freely available for academic no
 
 This version is compatible with BeamNG.tech 0.30 and BeamNGpy 1.27.
 
-## Configuration
 
-The environments assume an envirionment variable to be set that specifies where
-[BeamNG.tech](https://beamng.tech/) has been installed to. After
-obtaining a copy, set an environment variable called `BNG_HOME` that contains
-the path to your local installation's main directory -- the same that contains
-the `EULA.pdf` file.
+## Compatibility Table
+
+| **BeamNG.tech**  |**beamngpy**  | **beamng.gym** |
+|------------------|--------------|----------------|
+| 0.34             | 1.31         | 0.3            |
+| 0.30             | 1.27.1       | 0.2            |
+| Legacy release   | 0.4          | 0.1            |
+
+
 
 ## Usage
 
