@@ -121,9 +121,7 @@ class WCARaceGeometry(gym.Env):
         self.bng = BeamNGpy(host=self.host, port=self.port, home=self.home)
         self.bng.open()
 
-        self.vehicle = Vehicle('racecar', model='sunburst', license='BEAMNG',
-                               color='red',
-                               part_config='vehicles/sunburst/hillclimb.pc')
+        self.vehicle = Vehicle('racecar', model='etk800',license='BEAMNG',color='red')
 
         electrics = Electrics()
         damage = Damage()
