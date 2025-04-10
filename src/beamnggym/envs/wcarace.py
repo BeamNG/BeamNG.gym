@@ -51,7 +51,7 @@ class WCARaceGeometry(gym.Env):
     starting_proj = 1710
     max_damage = 100
 
-    def __init__(self, host='localhost', port=25252):
+    def __init__(self, host='localhost', port=25252, home=None):
         self.steps = WCARaceGeometry.sps // WCARaceGeometry.rate
         self.host = host
         self.port = port
@@ -73,9 +73,7 @@ class WCARaceGeometry(gym.Env):
         self.bng = BeamNGpy(self.host, self.port)
         self.bng.open()
 
-        self.vehicle = Vehicle('racecar', model='sunburst', license='BEAMNG',
-                               color='red',
-                               part_config='vehicles/sunburst/hillclimb.pc')
+        self.vehicle = Vehicle('racecar', model='etk800',license='BEAMNG',color='red')
 
         electrics = Electrics()
         damage = Damage()
