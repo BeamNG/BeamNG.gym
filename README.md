@@ -30,7 +30,8 @@ This version is compatible with BeamNG.tech 0.30 and BeamNGpy 1.27.
 
 | **BeamNG.tech**  |**beamngpy**  | **beamng.gym** |
 |------------------|--------------|----------------|
-| 0.35.5           | 1.32         | 0.4            |
+| 0.36             | 1.33         | 0.4            |
+| 0.35             | 1.32         | 0.4            |
 | 0.34             | 1.31         | 0.3            |
 | 0.30             | 1.27.1       | 0.2            |
 | Legacy release   | 0.4          | 0.1            |
